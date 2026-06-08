@@ -111,7 +111,7 @@ const EVALUATION_ITEMS = [
     },
     exampleSrc: 'assets/examples/example_7.png',
     guide: {
-      href: './ISO가이드.pdf',
+      href: './ISO_guide.pdf',
       label: '📘 가이드'
     }
   }
