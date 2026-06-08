@@ -1,5 +1,5 @@
 /**
- * 관리감독자 통합 관리 시스템 - GitHub Pages용 script.js v28
+ * 관리감독자 통합 관리 시스템 - GitHub Pages용 script.js v45
  *
  * 핵심 구조
  * - 화면: GitHub Pages
@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJUz6rMSyum1OVf8oVTmr9Hz1E2QtYNaHC8LzaeX0m1ldmn5X6YpAmPYortITtGfy9/exec';
+const APPS_SCRIPT_URL = '여기에_Apps_Script_웹앱_URL을_붙여넣으세요';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
@@ -5304,5 +5304,99 @@ function prefillFirstAppointmentStoreRow() {
     if (!btn) return;
     setTimeout(function () { if (typeof showLoading === 'function') showLoading(false); }, 700);
     setTimeout(function () { if (typeof showLoading === 'function') showLoading(false); }, 1800);
+  }, true);
+})();
+
+
+/* =========================================================
+   v45 선임 직후 반기평가 연결 보완
+   - 미선임자로 조회 → 신규 선임 완료 후에도 selectedGlobalContext가 needsAppointment=true로 남는 문제 해결
+   - 임명장 생성 완료 시 신규 선임한 첫 매장을 현재 업무 매장으로 자동 지정
+   - 반기평가 이동 버튼 클릭 시 최신 선임현황 기준으로 context 보정
+   ========================================================= */
+(function () {
+  function $(id) { return document.getElementById(id); }
+  function clean(v) { return String(v == null ? '' : v).trim(); }
+  function fullEmployeeIdFromAppointmentForm() {
+    var full = $('appointmentEmployeeIdFull');
+    if (full && clean(full.value)) return clean(full.value).toUpperCase();
+    var digits = $('appointmentEmployeeIdInput') ? String($('appointmentEmployeeIdInput').value || '').replace(/\D/g, '') : '';
+    if (digits) return 'AD' + digits;
+    try {
+      if (selectedGlobalContext && selectedGlobalContext.employeeId) return clean(selectedGlobalContext.employeeId).toUpperCase();
+    } catch (e) {}
+    return '';
+  }
+  function nameFromAppointmentForm() {
+    var input = $('appointmentName');
+    var name = input ? clean(input.value) : '';
+    if (name) return name;
+    try { return selectedGlobalContext && selectedGlobalContext.supervisorName ? clean(selectedGlobalContext.supervisorName) : ''; } catch (e) { return ''; }
+  }
+  function firstAppointmentStoreFromFormOrResults(results) {
+    var row = document.querySelector('#appointmentStoreList .appointment-store-card');
+    var fromForm = null;
+    if (row) {
+      fromForm = {
+        headquarter: clean((row.querySelector('[data-appt="headquarter"]') || {}).value),
+        department: clean((row.querySelector('[data-appt="department"]') || {}).value),
+        team: clean((row.querySelector('[data-appt="team"]') || {}).value),
+        storeName: clean((row.querySelector('[data-appt="storeName"]') || {}).value)
+      };
+    }
+    if ((!fromForm || !fromForm.storeName) && results && results.length) {
+      fromForm = { headquarter: '', department: '', team: '', storeName: clean(results[0].storeName || '') };
+    }
+    return fromForm && fromForm.storeName ? fromForm : null;
+  }
+  function setContextAfterAppointment(results) {
+    var store = firstAppointmentStoreFromFormOrResults(results || []);
+    var name = nameFromAppointmentForm();
+    var employeeId = fullEmployeeIdFromAppointmentForm();
+    if (!store || !name || !employeeId) return false;
+    var appointment = {
+      found: true,
+      appointed: true,
+      headquarter: store.headquarter || '',
+      storeType: store.headquarter || '',
+      department: store.department || '',
+      team: store.team || '',
+      storeName: store.storeName || '',
+      supervisorName: name,
+      employeeId: employeeId,
+      position: '점장',
+      status: '선임'
+    };
+    try {
+      selectedGlobalContext = {
+        headquarter: appointment.headquarter,
+        department: appointment.department,
+        team: appointment.team,
+        storeName: appointment.storeName,
+        supervisorName: appointment.supervisorName,
+        employeeId: appointment.employeeId,
+        appointment: appointment,
+        needsAppointment: false
+      };
+      globalAppointmentCandidate = appointment;
+    } catch (e) {}
+    try { if (typeof applySelectedContextToModules === 'function') applySelectedContextToModules(); } catch (e) {}
+    try { if (typeof updateV33TopContext === 'function') updateV33TopContext(); } catch (e) {}
+    try { if (typeof updateV39TopContext === 'function') updateV39TopContext(); } catch (e) {}
+    try { if (typeof updateSelectedInfoSummary === 'function') updateSelectedInfoSummary(); } catch (e) {}
+    return true;
+  }
+  if (typeof displayAppointmentResults === 'function' && !window.__v45DisplayAppointmentPatched) {
+    window.__v45DisplayAppointmentPatched = true;
+    var previousDisplayAppointmentResults = displayAppointmentResults;
+    displayAppointmentResults = function (results) {
+      setContextAfterAppointment(results || []);
+      return previousDisplayAppointmentResults.apply(this, arguments);
+    };
+  }
+  document.addEventListener('click', function (event) {
+    var goEval = event.target && event.target.closest ? event.target.closest('#goEvaluationAfterAppointmentBtn') : null;
+    if (!goEval) return;
+    setContextAfterAppointment([]);
   }, true);
 })();
