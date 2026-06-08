@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyNT79qWNITrDe17KDbZfcJB-yXwV7V_ngKzZwk5bCwTrdzmWEPAeka5UGNlWuHCnq2/exec';
+const APPS_SCRIPT_URL = '여기에_Apps_Script_웹앱_URL을_붙여넣으세요';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
@@ -5208,11 +5208,18 @@ function prefillFirstAppointmentStoreRow() {
     setLookupButtonLoading(true);
     setLoginMessage('pending', '선임 매장 정보를 조회하는 중입니다. 잠시만 기다려주세요.');
     try {
-      var data = await jsonpRequest({ mode: 'appointmentPersonVerifyFast', employeeId: employeeId, supervisorName: name }, 22000);
+      var data = await jsonpRequest({ mode: 'appointmentPersonLoginV46', employeeId: employeeId, supervisorName: name }, 22000);
       if (!data || data.success === false) throw new Error(data && data.message ? data.message : '조회 실패');
       var rows = (data.appointments || []);
-      if (rows.length) showStoreList(name, employeeId, rows);
-      else showNoAppointment(name, employeeId);
+      if (rows.length) {
+        var displayName = rows[0].supervisorName || name;
+        showStoreList(displayName, employeeId, rows);
+      } else if (data.nameMismatch) {
+        var names = (data.candidateNames || []).filter(Boolean).join(', ');
+        setLoginMessage('error', '사번은 확인되었지만 성명이 일치하지 않습니다.<br><span class="v40-input-row-note">등록된 성명: ' + esc(names || '확인 필요') + '<br>한글 정자, 띄어쓰기, 오탈자를 확인해주세요.</span>');
+      } else {
+        showNoAppointment(name, employeeId);
+      }
     } catch (err) {
       console.error(err);
       setLoginMessage('error', '조회 중 오류가 발생했습니다.<br>' + esc(err.message || String(err)) + '<br><span class="v40-input-row-note">Apps Script 새 배포 여부와 script.js의 APPS_SCRIPT_URL을 확인해주세요.</span>');
@@ -5309,7 +5316,7 @@ function prefillFirstAppointmentStoreRow() {
 
 
 /* =========================================================
-   v45 선임 직후 반기평가 연결 보완
+   v46 본인확인 안정화 및 선임 직후 반기평가 연결 보완
    - 미선임자로 조회 → 신규 선임 완료 후에도 selectedGlobalContext가 needsAppointment=true로 남는 문제 해결
    - 임명장 생성 완료 시 신규 선임한 첫 매장을 현재 업무 매장으로 자동 지정
    - 반기평가 이동 버튼 클릭 시 최신 선임현황 기준으로 context 보정
