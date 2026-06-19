@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyEQTwfpRCgrujSBPNvyPHLR7B5CYW2jgwk8hDSWpC4IqAu4nxNO3vEo71dQrISiLjC/exec';
+const APPS_SCRIPT_URL = '여기에_Apps_Script_웹앱_URL을_붙여넣으세요';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
@@ -206,7 +206,7 @@ form.addEventListener('submit', async function (event) {
   const confirmed = await confirmSubmissionDetails(basicForConfirm);
   if (!confirmed) return;
 
-  showLoading(true, '동일 사번·성명·매장으로 이미 제출된 내역이 있는지 확인 중입니다.');
+  showLoading(true, '동일 사번·성명·매장으로 이미 제출된 내역이 있는지 확인 중입니다.', null, 'step-dup');
   submitBtn.disabled = true;
   submitBtn.textContent = '제출 확인 중...';
 
@@ -230,16 +230,17 @@ form.addEventListener('submit', async function (event) {
       return;
     }
 
-    showLoading(true, '사진을 압축하고 제출 자료를 준비 중입니다. 창을 닫지 말고 기다려주세요.');
+    showLoading(true, '사진을 압축하고 제출 자료를 준비 중입니다. 창을 닫지 말고 기다려주세요.', null, 'step-photo');
     submitBtn.textContent = '제출 중입니다...';
 
     const payload = await buildPayload();
 
-    showLoading(true, '자료를 전송 중입니다. 네트워크 상태에 따라 시간이 걸릴 수 있습니다.');
+    showLoading(true, '자료를 전송 중입니다. 네트워크 상태에 따라 시간이 걸릴 수 있습니다.', null, 'step-send');
     await postPayloadByHiddenForm(payload);
 
-    showLoading(true, '자료가 전송되었습니다. 저장 완료 여부를 확인 중입니다.');
+    showLoading(true, '자료가 전송되었습니다. Drive에 저장 중입니다. 잠시만 기다려주세요.', null, 'step-drive');
     const status = await waitForSaveStatus(payload.submissionId);
+    showLoading(true, '저장 완료 여부를 확인 중입니다.', null, 'step-done');
 
     if (status && status.success) {
       showLoading(false);
@@ -1315,11 +1316,80 @@ function resetFormAfterSuccess() {
   showEntryPage(true);
 }
 
-function showLoading(show, message, title) {
-  if (title && loadingTitle) loadingTitle.textContent = title;
-  if (!title && loadingTitle && show) loadingTitle.textContent = '제출 중입니다';
-  if (message) loadingText.textContent = message;
-  loadingOverlay.hidden = !show;
+// ── 제출 진행 상태 관리 ──
+let _wakeLock = null;
+
+async function acquireWakeLock() {
+  if ('wakeLock' in navigator) {
+    try { _wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+}
+function releaseWakeLock() {
+  if (_wakeLock) { try { _wakeLock.release(); } catch (e) {} _wakeLock = null; }
+}
+
+// 제출 단계 체크리스트 정의
+const SUBMIT_STEPS = [
+  { id: 'step-dup',    label: '중복 제출 확인' },
+  { id: 'step-photo',  label: '사진 압축 처리' },
+  { id: 'step-send',   label: '서버로 전송 중' },
+  { id: 'step-drive',  label: 'Drive 저장 중' },
+  { id: 'step-done',   label: '저장 완료 확인' }
+];
+
+function showLoading(show, message, title, stepId) {
+  if (!show) {
+    loadingOverlay.hidden = true;
+    releaseWakeLock();
+    return;
+  }
+
+  // WakeLock 요청 (화면 꺼짐 방지)
+  acquireWakeLock();
+
+  // 오버레이 표시
+  loadingOverlay.hidden = false;
+
+  // 제목
+  if (loadingTitle) loadingTitle.textContent = title || '제출 중입니다';
+
+  // 체크리스트 렌더링 (최초 또는 없는 경우)
+  let checklist = document.getElementById('submitChecklist');
+  if (!checklist) {
+    checklist = document.createElement('div');
+    checklist.id = 'submitChecklist';
+    checklist.style.cssText = 'margin:12px 0 8px;text-align:left;';
+    const loadingCard = loadingOverlay.querySelector('.loading-card');
+    if (loadingCard && loadingText) loadingCard.insertBefore(checklist, loadingText);
+  }
+  checklist.innerHTML = SUBMIT_STEPS.map(function (step) {
+    const isDone   = stepId && SUBMIT_STEPS.findIndex(function(s){return s.id===stepId;}) > SUBMIT_STEPS.findIndex(function(s){return s.id===step.id;});
+    const isActive = step.id === stepId;
+    const icon = isDone ? '✅' : (isActive ? '⏳' : '⬜');
+    const color = isDone ? '#15803d' : (isActive ? '#d97706' : '#9ca3af');
+    return '<div style="font-size:13px;font-weight:700;color:' + color + ';padding:3px 0;">' + icon + ' ' + step.label + '</div>';
+  }).join('');
+
+  // 게이지바 업데이트
+  let gauge = document.getElementById('submitGauge');
+  if (!gauge) {
+    const gaugeWrap = document.createElement('div');
+    gaugeWrap.style.cssText = 'margin:10px 0 4px;height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden;';
+    gauge = document.createElement('div');
+    gauge.id = 'submitGauge';
+    gauge.style.cssText = 'height:100%;border-radius:999px;background:linear-gradient(90deg,#1d4ed8,#e60012);transition:width 0.5s ease;width:0%;';
+    gaugeWrap.appendChild(gauge);
+    const loadingCard = loadingOverlay.querySelector('.loading-card');
+    if (loadingCard && loadingText) loadingCard.insertBefore(gaugeWrap, loadingText);
+  }
+  if (stepId) {
+    const stepIdx = SUBMIT_STEPS.findIndex(function(s){return s.id===stepId;});
+    const pct = stepIdx < 0 ? 5 : Math.round(((stepIdx + 1) / SUBMIT_STEPS.length) * 100);
+    gauge.style.width = pct + '%';
+  }
+
+  // 메시지
+  if (message && loadingText) loadingText.textContent = message;
 }
 
 
