@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxrtxdJJwaeFLcSSAI63o77Vl8q6heHpikaJKzwbVzMrzLP1lnUyZsfRioBADyO2Khb/exec';
+const APPS_SCRIPT_URL = '여기에_Apps_Script_웹앱_URL을_붙여넣으세요';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
@@ -2141,10 +2141,6 @@ let patrolSignatureContext = null;
 let patrolSignatureDrawing = false;
 let patrolLastSignaturePoint = null;
 
-window.addEventListener('DOMContentLoaded', function () {
-  initPatrolModule();
-});
-
 function initV19ModuleSwitch() {
   const evaluationModule = document.getElementById('evaluationModule');
   const appointmentModule = document.getElementById('appointmentModule');
@@ -2280,27 +2276,6 @@ function switchToEvaluationModule() {
   if (showPatrolBtn) showPatrolBtn.classList.remove('active');
   syncGlobalModuleNavigation('evaluation');
   showEntryPage(false);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function switchToPatrolModule() {
-  const evaluationModule = document.getElementById('evaluationModule');
-  const appointmentModule = document.getElementById('appointmentModule');
-  const patrolModule = document.getElementById('patrolModule');
-  const showEvaluationBtn = document.getElementById('showEvaluationModuleBtn');
-  const showAppointmentBtn = document.getElementById('showAppointmentModuleBtn');
-  const showPatrolBtn = document.getElementById('showPatrolModuleBtn');
-  setHomeVisibility(false);
-  if (evaluationModule) evaluationModule.hidden = true;
-  if (appointmentModule) appointmentModule.hidden = true;
-  if (patrolModule) patrolModule.hidden = false;
-  if (showEvaluationBtn) showEvaluationBtn.classList.remove('active');
-  if (showAppointmentBtn) showAppointmentBtn.classList.remove('active');
-  if (showPatrolBtn) showPatrolBtn.classList.add('active');
-  syncGlobalModuleNavigation('patrol');
-  updatePatrolWeekInfo();
-  populatePatrolHeadquarters();
-  setTimeout(function () { resizePatrolSignatureCanvas(true); }, 120);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -3579,23 +3554,12 @@ function switchToAppointmentModule() {
 }
 
 function switchToPatrolModule() {
-  if (!requireGlobalContextBeforeModule()) return;
-  const orgPage = document.getElementById('orgSelectPage');
-  const workPage = document.getElementById('workSelectPage');
-  const appointmentModule = document.getElementById('appointmentModule');
-  const patrolModule = document.getElementById('patrolModule');
-  const evaluationModule = document.getElementById('evaluationModule');
-  if (orgPage) orgPage.hidden = true;
-  if (workPage) workPage.hidden = true;
-  if (appointmentModule) appointmentModule.hidden = true;
-  if (patrolModule) patrolModule.hidden = false;
-  if (evaluationModule) evaluationModule.hidden = true;
-  syncGlobalModuleNavigation('patrol');
-  applySelectedContextToModules();
-  renderModuleContextSummary('patrolContextSummary', '주간순회점검');
-  updatePatrolWeekInfo();
-  setTimeout(function () { resizePatrolSignatureCanvas(true); }, 120);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showSubmitModal({
+    type: 'error',
+    title: '주간순회점검 준비 중',
+    html: '주간순회점검 기능은 현재 준비 중입니다.<br><p class="modal-small-text">빠른 시일 내 오픈 예정입니다. 안전보건팀에 문의해주세요.</p>',
+    confirmText: '확인'
+  });
 }
 
 function switchToEvaluationModule() {
@@ -4183,29 +4147,12 @@ function prefillFirstAppointmentStoreRow() {
   };
 
   window.switchToPatrolModule = function () {
-    if (!requireGlobalContextBeforeModule()) return;
-    if (selectedGlobalContext.needsAppointment) {
-      showSubmitModal({ type: 'error', title: '관리감독자 선임 필요', html: '주간순회점검은 관리감독자 선임 후 진행할 수 있습니다.<br><br>먼저 <strong>선임/해임 신고</strong>에서 관리감독자를 선임해주세요.', confirmText: '선임/해임으로 이동' })
-        .then(function () { switchToAppointmentModule(); });
-      return;
-    }
-    const orgPage = $('orgSelectPage');
-    const workPage = $('workSelectPage');
-    const appointmentModule = $('appointmentModule');
-    const patrolModule = $('patrolModule');
-    const evaluationModule = $('evaluationModule');
-    if (orgPage) orgPage.hidden = true;
-    if (workPage) workPage.hidden = true;
-    if (appointmentModule) appointmentModule.hidden = true;
-    if (patrolModule) patrolModule.hidden = false;
-    if (evaluationModule) evaluationModule.hidden = true;
-    syncGlobalModuleNavigation('patrol');
-    applySelectedContextToModules();
-    renderModuleContextSummary('patrolContextSummary', '주간순회점검');
-    simplifyV34StaticCards();
-    updatePatrolWeekInfo();
-    setTimeout(function () { resizePatrolSignatureCanvas(true); }, 120);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showSubmitModal({
+      type: 'error',
+      title: '주간순회점검 준비 중',
+      html: '주간순회점검 기능은 현재 준비 중입니다.<br><p class="modal-small-text">빠른 시일 내 오픈 예정입니다. 안전보건팀에 문의해주세요.</p>',
+      confirmText: '확인'
+    });
   };
 
   window.switchToEvaluationModule = function () {
@@ -4880,13 +4827,12 @@ function prefillFirstAppointmentStoreRow() {
     };
 
     window.switchToPatrolModule = function () {
-      if (!requireGlobalContextBeforeModule()) return;
-      if (selectedGlobalContext.needsAppointment) return showNeedAppointmentModal();
-      showBusinessModule('patrolModule', 'patrol');
-      applySelectedContextToModules && applySelectedContextToModules();
-      renderModuleContextSummary && renderModuleContextSummary('patrolContextSummary', '주간순회점검');
-      updatePatrolWeekInfo && updatePatrolWeekInfo();
-      setTimeout(function () { resizePatrolSignatureCanvas && resizePatrolSignatureCanvas(true); }, 120);
+      showSubmitModal({
+        type: 'error',
+        title: '주간순회점검 준비 중',
+        html: '주간순회점검 기능은 현재 준비 중입니다.<br><p class="modal-small-text">빠른 시일 내 오픈 예정입니다. 안전보건팀에 문의해주세요.</p>',
+        confirmText: '확인'
+      });
     };
 
     window.switchToEvaluationModule = function () {
