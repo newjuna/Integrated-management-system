@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxxf9deDvw33FOg4tTQNfxY38lkamgjc6GuMbafgSEHPM1rnBLbYsoTT3srg9mkQvzV/exec';
+const APPS_SCRIPT_URL = '여기에_Apps_Script_웹앱_URL을_붙여넣으세요';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
@@ -1341,19 +1341,29 @@ function showLoading(show, message, title, stepId) {
   if (!show) {
     loadingOverlay.hidden = true;
     releaseWakeLock();
+    // 체크리스트/게이지 초기화
+    const old = document.getElementById('submitChecklist');
+    if (old) old.remove();
+    const oldG = document.getElementById('submitGauge');
+    if (oldG && oldG.parentNode) oldG.parentNode.remove();
     return;
   }
 
-  // WakeLock 요청 (화면 꺼짐 방지)
   acquireWakeLock();
-
-  // 오버레이 표시
   loadingOverlay.hidden = false;
+  if (loadingTitle) loadingTitle.textContent = title || '처리 중입니다';
 
-  // 제목
-  if (loadingTitle) loadingTitle.textContent = title || '제출 중입니다';
+  // stepId 가 없으면 체크리스트/게이지 없이 단순 메시지만 표시
+  if (!stepId) {
+    const old = document.getElementById('submitChecklist');
+    if (old) old.remove();
+    const oldG = document.getElementById('submitGauge');
+    if (oldG && oldG.parentNode) oldG.parentNode.remove();
+    if (message && loadingText) loadingText.textContent = message;
+    return;
+  }
 
-  // 체크리스트 렌더링 (최초 또는 없는 경우)
+  // 체크리스트 렌더링
   let checklist = document.getElementById('submitChecklist');
   if (!checklist) {
     checklist = document.createElement('div');
@@ -1362,18 +1372,22 @@ function showLoading(show, message, title, stepId) {
     const loadingCard = loadingOverlay.querySelector('.loading-card');
     if (loadingCard && loadingText) loadingCard.insertBefore(checklist, loadingText);
   }
-  checklist.innerHTML = SUBMIT_STEPS.map(function (step) {
-    const isDone   = stepId && SUBMIT_STEPS.findIndex(function(s){return s.id===stepId;}) > SUBMIT_STEPS.findIndex(function(s){return s.id===step.id;});
-    const isActive = step.id === stepId;
-    const icon = isDone ? '✅' : (isActive ? '⏳' : '⬜');
+  const currentIdx = SUBMIT_STEPS.findIndex(function (s) { return s.id === stepId; });
+  checklist.innerHTML = SUBMIT_STEPS.map(function (step, i) {
+    const isDone   = i < currentIdx;
+    const isActive = i === currentIdx;
+    const icon  = isDone ? '✅' : (isActive ? '⏳' : '⬜');
     const color = isDone ? '#15803d' : (isActive ? '#d97706' : '#9ca3af');
-    return '<div style="font-size:13px;font-weight:700;color:' + color + ';padding:3px 0;">' + icon + ' ' + step.label + '</div>';
+    const weight = isActive ? '900' : '700';
+    return '<div style="font-size:13px;font-weight:' + weight + ';color:' + color + ';padding:3px 0;">' + icon + ' ' + step.label + '</div>';
   }).join('');
 
-  // 게이지바 업데이트
+  // 게이지바
+  let gaugeWrap = document.getElementById('submitGaugeWrap');
   let gauge = document.getElementById('submitGauge');
-  if (!gauge) {
-    const gaugeWrap = document.createElement('div');
+  if (!gaugeWrap) {
+    gaugeWrap = document.createElement('div');
+    gaugeWrap.id = 'submitGaugeWrap';
     gaugeWrap.style.cssText = 'margin:10px 0 4px;height:8px;border-radius:999px;background:#e5e7eb;overflow:hidden;';
     gauge = document.createElement('div');
     gauge.id = 'submitGauge';
@@ -1382,13 +1396,11 @@ function showLoading(show, message, title, stepId) {
     const loadingCard = loadingOverlay.querySelector('.loading-card');
     if (loadingCard && loadingText) loadingCard.insertBefore(gaugeWrap, loadingText);
   }
-  if (stepId) {
-    const stepIdx = SUBMIT_STEPS.findIndex(function(s){return s.id===stepId;});
-    const pct = stepIdx < 0 ? 5 : Math.round(((stepIdx + 1) / SUBMIT_STEPS.length) * 100);
+  if (gauge) {
+    const pct = currentIdx < 0 ? 5 : Math.round(((currentIdx + 1) / SUBMIT_STEPS.length) * 100);
     gauge.style.width = pct + '%';
   }
 
-  // 메시지
   if (message && loadingText) loadingText.textContent = message;
 }
 
@@ -1751,7 +1763,11 @@ function displayAppointmentResults(results) {
     (results || []).forEach(function (r) {
       const item = document.createElement('div');
       item.className = 'download-item';
-      item.innerHTML = `<span>📍 ${escapeHtml(r.storeName || '')}</span><a class="btn-small-dl" href="${escapeHtml(r.viewUrl || '#')}" target="_blank" rel="noopener">PDF 열기</a>`;
+      item.innerHTML = `<span>📍 ${escapeHtml(r.storeName || '')}</span>${(() => {
+        const pdfUrl = r.viewUrl || '#';
+        const isDrive = pdfUrl.indexOf('drive.google.com') !== -1 || pdfUrl.indexOf('docs.google.com') !== -1;
+        return `<a class="btn-small-dl" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noopener">${isDrive ? '📄 Drive에서 열기' : 'PDF 열기'}</a>`;
+      })()}`;
       list.appendChild(item);
     });
   }
@@ -2133,7 +2149,12 @@ function displayAppointmentResults(results) {
     (results || []).forEach(function (r) {
       const item = document.createElement('div');
       item.className = 'download-item';
-      item.innerHTML = '<span>📍 ' + escapeHtml(r.storeName || '') + '</span><a class="btn-small-dl" href="' + escapeHtml(r.viewUrl || '#') + '" target="_blank" rel="noopener">PDF 열기</a>';
+      // Drive URL이면 바로 열기, 아니면 기존 viewFile URL
+      const pdfUrl = r.viewUrl || '#';
+      const isDrive = pdfUrl.indexOf('drive.google.com') !== -1 || pdfUrl.indexOf('docs.google.com') !== -1;
+      item.innerHTML = '<span>📍 ' + escapeHtml(r.storeName || '') + '</span>' +
+        '<a class="btn-small-dl" href="' + escapeHtml(pdfUrl) + '" target="_blank" rel="noopener">' +
+        (isDrive ? '📄 Drive에서 열기' : 'PDF 열기') + '</a>';
       list.appendChild(item);
     });
   }
