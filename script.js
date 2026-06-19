@@ -10,7 +10,7 @@
  *
  * 사용 전 반드시 아래 APPS_SCRIPT_URL을 본인의 Apps Script 웹앱 URL로 변경하세요.
  */
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwPCYcjacVY5p7icNF0qdWxEfezgVUHP0Z2uMZyE0w9AES07ZLGRvN85BKXYqL5bMJp/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8cYaad5cxylyCTLeiz-0La0Bezwn61sb-2q6ToPEzGJaFlxYtDcRSeqC0Bg29H0t8/exec';
 const IMAGE_COMPRESSION_CONFIG = {
   targetDataUrlLength: 260000,
   maxDataUrlLength: 360000,
